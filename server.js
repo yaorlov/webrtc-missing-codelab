@@ -3,6 +3,7 @@ const http = require('http');
 
 const WebSocket = require('ws');
 const uuid = require('uuid');
+const SDPUtils = require('sdp');
 
 const port = 8080;
  
@@ -88,6 +89,33 @@ wss.on('connection', (ws) => {
         if (!data.id) {
             console.log(id, 'missing id', data);
             return;
+        }
+
+        if (data.type === 'offer') {
+          try {
+            const sections = SDPUtils.splitSections(data.sdp);
+            sections.shift();
+            for (let sdpMLineIndex = 0; sdpMLineIndex < sections.length; sdpMLineIndex++) {
+              const kind = SDPUtils.getKind(sections[sdpMLineIndex]);
+              if (!(['audio', 'video'].includes(kind))) {
+                // SDP inspection to reject any non audio/video content. This means
+                // the server will not let clients exchange datachannel SDP so
+                // that a vulnerability like
+                //   https://googleprojectzero.blogspot.com/2020/08/exploiting-android-messengers-part-3.html
+                // is prevented. Note that native clients should also not include usrsctp
+                // if they know that datachannels are not used.
+                console.error(id, 'unknown media type detected', kind, sections[sdpMLineIndex]);
+                // Drop the message, disconnect the offending client forcefully.
+                ws.terminate();
+                return;
+              }
+            }
+          } catch(e) {
+            console.error(id, 'error while munging SDP', e.toString());
+            // Drop the message, disconnect the offending client forcefully.
+            ws.terminate();
+            return;
+          }
         }
 
         // The direct lookup of the other clients websocket is overly simplified.
