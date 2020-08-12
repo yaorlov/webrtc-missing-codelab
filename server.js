@@ -109,6 +109,28 @@ wss.on('connection', (ws) => {
                 ws.terminate();
                 return;
               }
+              // Remove any extmap lines. This prevents the RTP header extensions suspectible to
+              //   https://googleprojectzero.blogspot.com/2020/08/exploiting-android-messengers-part-1.html
+              // from being negotiated.
+              // We still want the audio/video call to be negotiated so we remove the lines from the SDP.
+              // This removes
+              //   http://tools.ietf.org/html/draft-ietf-avtext-framemarking-07
+              //   http://www.webrtc.org/experiments/rtp-hdrext/video-timing
+              // from both audio and video (just in case)
+              const extensionsToFilter = [
+                'http://tools.ietf.org/html/draft-ietf-avtext-framemarking-07',
+                'http://www.webrtc.org/experiments/rtp-hdrext/video-timing',
+              ];
+              const extensions = SDPUtils.matchPrefix(sections[sdpMLineIndex], 'a=extmap:');
+              extensions.forEach(line => {
+                const extension = SDPUtils.parseExtmap(line);
+                if (extensionsToFilter.includes(extension.uri)) {
+                  // Remove the line, in both possible variants since SDP allows both
+                  // LF and CRLF as line separators.
+                  data.sdp = data.sdp.replace(line + '\r\n', '');
+                  data.sdp = data.sdp.replace(line + '\n', '');
+                }
+              });
             }
           } catch(e) {
             console.error(id, 'error while munging SDP', e.toString());
