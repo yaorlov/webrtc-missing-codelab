@@ -3,6 +3,7 @@ const http = require('http');
 
 const WebSocket = require('ws');
 const uuid = require('uuid');
+const twilio = require('twilio');
 
 const port = 8080;
  
@@ -38,6 +39,11 @@ function generateClientId() {
     // TODO: enforce uniqueness here instead of below.
     return uuid.v4();
 }
+
+// Initialize Twilio client
+const accountSid = process.env.TWILIO_ACCOUNT_SID;
+const authToken = process.env.TWILIO_AUTH_TOKEN;
+const twilioClient = twilio(accountSid, authToken);
  
 wss.on('connection', (ws) => {
     // Assign an id to the client. The other alternative is to have the client
@@ -62,10 +68,12 @@ wss.on('connection', (ws) => {
 
     // Send an ice server configuration to the client. For stun this is synchronous,
     // for TURN it might require getting credentials.
-    ws.send(JSON.stringify({
+    twilioClient.tokens.create().then(token => 
+      ws.send(JSON.stringify({
         type: 'iceServers',
-        iceServers: [{urls: 'stun:stun.l.google.com:19302'}],
-    }));
+        iceServers: token.iceServers,
+      }))
+    );
 
     // Remove the connection. Note that this does not tell anyone you are currently in a call with
     // that this happened. This would require additional statekeeping that is not done here.
