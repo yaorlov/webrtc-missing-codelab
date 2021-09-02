@@ -1,3 +1,6 @@
+// When offerCallback is set, don't auto-answer incoming calls.
+let offerCallback = null;
+
 // Audio and video muting.
 const audioBtn = document.getElementById("audioBtn");
 audioBtn.addEventListener("click", () => {
@@ -128,6 +131,7 @@ async function getUserMedia() {
     video: true,
   });
   document.getElementById("localVideo").srcObject = stream;
+  localStream = stream;
   return stream;
 }
 
@@ -201,15 +205,22 @@ function connect() {
               type: data.type,
               sdp: data.sdp,
             });
-            const answer = await pc.createAnswer();
-            await pc.setLocalDescription(answer);
-            ws.send(
-              JSON.stringify({
-                type: "answer",
-                sdp: answer.sdp,
-                id: data.id,
-              })
-            );
+
+            // Automatically answering is appropriate for things like multi-user chats.
+            // It is not for 1:1 typically.
+            if (!offerCallback) {
+              const answer = await pc.createAnswer();
+              await pc.setLocalDescription(answer);
+              ws.send(
+                JSON.stringify({
+                  type: "answer",
+                  sdp: answer.sdp,
+                  id: data.id,
+                })
+              );
+            } else {
+              offerCallback(data.id);
+            }
             hangupBtn.disabled = false;
           } else {
             console.log("Subsequent offer not implemented");
@@ -408,6 +419,24 @@ async function call(id) {
   document.getElementById("peerId").innerText = id;
 }
 
+async function answer(id) {
+  if (!peers.has(id)) {
+    console.log("can not answer, no peer with", id);
+    return;
+  }
+  const pc = peers.get(id);
+  const answer = await pc.createAnswer();
+  await pc.setLocalDescription(answer);
+  ws.send(
+    JSON.stringify({
+      type: "answer",
+      sdp: answer.sdp,
+      id: id,
+    })
+  );
+  hangupBtn.disabled = false;
+}
+
 // Send a signal to the peer that the call has ended and close the connection.
 function hangup(id) {
   if (!peers.has(id)) {
@@ -426,20 +455,22 @@ function hangup(id) {
   );
 }
 
-// Autoconnect when given a peer id, i.e. #someid
-const initialHash = window.location.hash.substr(1);
+if (!offerCallback) {
+  // Autoconnect when given a peer id, i.e. #someid
+  const initialHash = window.location.hash.substr(1);
 
-// Get the camera, then connect to signaling. Makes things simple.
-getUserMedia()
-  .then((stream) => {
-    localStream = stream;
-    return connect();
-  })
-  .then(() => {
-    if (initialHash.length) {
-      call(initialHash);
-    }
-  });
+  // Get the camera, then connect to signaling. Makes things simple.
+  getUserMedia()
+    .then((stream) => {
+      localStream = stream;
+      return connect();
+    })
+    .then(() => {
+      if (initialHash.length) {
+        call(initialHash);
+      }
+    });
+}
 
 window.addEventListener("beforeunload", () => {
   if (ws && ws.readyState === WebSocket.OPEN) {

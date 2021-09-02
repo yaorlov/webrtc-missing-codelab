@@ -17,6 +17,7 @@ server.on("listening", () => {
 server.on("request", (request, response) => {
   const urlToPath = {
     "/": "static/index.html",
+    "/no-autodial": "static/no_autodial.html",
     "/index.js": "static/index.js",
     "/index.css": "static/index.css",
   };
