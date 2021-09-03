@@ -26,6 +26,8 @@ videoBtn.addEventListener("click", () => {
   // off the camera light.
 });
 
+const connectionStateIcon = document.getElementById("connectionState");
+
 // Relatively self-contained screensharing/replaceTrack example.
 let screenShare;
 function replaceVideoTrack(withTrack) {
@@ -293,6 +295,7 @@ function createPeerConnection(id) {
       console.log(id, "loaded metadata");
     };
     remoteVideo.srcObject = e.streams[0];
+    connectionStateIcon.style.display = "block";
   });
   pc.addEventListener("iceconnectionstatechange", () => {
     console.log(id, "iceconnectionstatechange", pc.iceConnectionState);
@@ -390,6 +393,8 @@ async function queryBitrateStats(pc, lastResult) {
         console.log(
           `Bitrate ${bitrate}kbps, overhead ${headerrate}kbps, ${packetrate} packets/second`
         );
+        // We use the title attribute as a built-in tooltip.
+        connectionStateIcon.title = `Bitrate ${bitrate}kbps, overhead ${headerrate}kbps, ${packetrate} packets/second`;
       }
     }
   });
