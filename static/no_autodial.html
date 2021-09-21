@@ -9,7 +9,6 @@
             <video id="localVideo" autoplay muted playsinline></video>
         </div>
         <div class="videocontainer right">
-            <div id="connectionState">&#x1f4f6;</div>
             <video id="remoteVideo" autoplay playsinline></video>
         </div>
         <div class="left">
@@ -18,6 +17,8 @@
                 <button id="audioBtn">mute audio</button>
                 <button id="videoBtn">mute video</button>
                 <button id="shareBtn">share screen</button>
+            </p>
+            <p>
                 <label>Bandwidth:</label>
                 <select id="bandwidth">
                     <option value="unlimited" selected>unlimited</option>
@@ -26,15 +27,50 @@
                     <option value="500">500</option>
                     <option value="250">250</option>
                     <option value="125">125</option>
+                </select>kbps
+            </p>
+            <p>
+                <label>Codec preferences:</label>
+                <select id="codecPreferences" disabled>
+                    <option selected value="">Default</option>
                 </select>
             </p>
         </div>
         <div class="right">
-            <p>Peer ID: <span id="peerId"></span></p>
+            <p>Peer ID: <input id="peerId" placeholder="whom to call"></input></p>
             <p>
+                <button id="callButton">call</button>
+                <button id="answerButton" disabled>answer</button>
                 <button id="hangupButton" disabled>hangup</button>
             </p>
         </div>
     </div>
     <script src="/index.js"></script>
+    <script>
+/* globals getUserMedia, connect, call, answer */
+// Get the camera, then connect to signaling. Makes things simple.
+getUserMedia()
+  .then((/*stream*/) => {
+    return connect();
+});
+
+const callBtn = document.getElementById('callButton');
+callBtn.addEventListener('click', () => {
+    call(document.getElementById('peerId').value);
+    callBtn.disabled = true;
+});
+
+const answerBtn = document.getElementById('answerButton');
+answerBtn.addEventListener('click', () => {
+    answer(document.getElementById('peerId').value);
+    answerBtn.disabled = true;
+});
+
+// eslint-disable-next-line no-global-assign, no-undef
+offerCallback = (id) => { // Setting this disables autoanswer behaviour
+    callBtn.disabled = true;
+    answerBtn.disabled = false;
+    document.getElementById('peerId').value = id;
+};
+    </script>
 </body>
