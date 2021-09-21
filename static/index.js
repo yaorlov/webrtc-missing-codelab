@@ -26,6 +26,25 @@ videoBtn.addEventListener("click", () => {
   // off the camera light.
 });
 
+// Change the video codec.
+const codecPreferences = document.querySelector("#codecPreferences");
+const supportsSetCodecPreferences =
+  window.RTCRtpTransceiver &&
+  "setCodecPreferences" in window.RTCRtpTransceiver.prototype;
+if (supportsSetCodecPreferences && codecPreferences) {
+  const { codecs } = RTCRtpSender.getCapabilities("video");
+  codecs.forEach((codec) => {
+    if (["video/red", "video/ulpfec", "video/rtx"].includes(codec.mimeType)) {
+      return;
+    }
+    const option = document.createElement("option");
+    option.value = (codec.mimeType + " " + (codec.sdpFmtpLine || "")).trim();
+    option.innerText = option.value;
+    codecPreferences.appendChild(option);
+  });
+  codecPreferences.disabled = false;
+}
+
 const connectionStateIcon = document.getElementById("connectionState");
 
 // Relatively self-contained screensharing/replaceTrack example.
@@ -411,6 +430,30 @@ async function call(id) {
   if (localStream) {
     localStream.getTracks().forEach((t) => pc.addTrack(t, localStream));
   }
+
+  // Change the codec. Only on the no-autodial page.
+  if (supportsSetCodecPreferences && codecPreferences) {
+    const preferredCodec =
+      codecPreferences.options[codecPreferences.selectedIndex];
+    if (preferredCodec.value !== "") {
+      const [mimeType, sdpFmtpLine] = preferredCodec.value.split(" ");
+      const { codecs } = RTCRtpSender.getCapabilities("video");
+      const selectedCodecIndex = codecs.findIndex(
+        (c) => c.mimeType === mimeType && c.sdpFmtpLine === sdpFmtpLine
+      );
+      const selectedCodec = codecs[selectedCodecIndex];
+      codecs.slice(selectedCodecIndex, 1);
+      codecs.unshift(selectedCodec);
+      const transceiver = pc
+        .getTransceivers()
+        .find(
+          (t) => t.sender && t.sender.track === localStream.getVideoTracks()[0]
+        );
+      transceiver.setCodecPreferences(codecs);
+      console.log("Preferred video codec", selectedCodec);
+    }
+  }
+
   const offer = await pc.createOffer();
   await pc.setLocalDescription(offer);
   ws.send(
@@ -458,6 +501,9 @@ function hangup(id) {
       id,
     })
   );
+  if (codecPreferences) {
+    codecPreferences.disabled = !supportsSetCodecPreferences;
+  }
 }
 
 if (!offerCallback) {
